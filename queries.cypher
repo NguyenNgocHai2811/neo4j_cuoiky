@@ -138,5 +138,7 @@ LIMIT 1;
 
 // 20. Bay từ Vietnam sang US bằng Vietnam Airlines (5309)
 MATCH (s:Airport {country: 'Vietnam'}), (d:Airport {country: 'United States'})
-MATCH p = shortestPath((s)-[:ROUTE {airlineID: '5309'}]*->(d))
-RETURN p IS NOT NULL AS Possible;
+MATCH p = shortestPath((s)-[:ROUTE*..5]->(d))
+WHERE all(r in relationships(p) WHERE r.airlineID = '5309')
+RETURN p IS NOT NULL AS Possible
+LIMIT 1;

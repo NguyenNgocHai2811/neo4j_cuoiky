@@ -258,7 +258,8 @@ LIMIT 1;
 **Câu lệnh Cypher:**
 ```cypher
 MATCH (s:Airport {country: 'Vietnam'}), (d:Airport {country: 'United States'})
-MATCH p = shortestPath((s)-[:ROUTE {airlineID: '5309'}]*->(d))
+MATCH p = shortestPath((s)-[:ROUTE*..5]->(d))
+WHERE all(r in relationships(p) WHERE r.airlineID = '5309')
 RETURN p IS NOT NULL AS Possible
 LIMIT 1;
 ```
