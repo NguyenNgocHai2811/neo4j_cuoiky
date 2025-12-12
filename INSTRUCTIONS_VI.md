@@ -1,40 +1,40 @@
-# Hướng dẫn Import Dữ liệu (Neo4j 2.0.3 Legacy)
+# Hướng dẫn Import Dữ liệu và Chạy Truy vấn (Neo4j Desktop 5.x)
 
-Do phiên bản Neo4j 2.0.3 (ra mắt ~2014) rất cũ và chưa hỗ trợ lệnh `LOAD CSV` tiêu chuẩn, bạn cần sử dụng một script Python để nạp dữ liệu thông qua giao thức HTTP (REST API).
+Tài liệu này hướng dẫn cách nạp dữ liệu vào Neo4j Desktop phiên bản hiện đại (5.x trở lên).
 
-## 1. Chuẩn bị
+## 1. Chuẩn bị File CSV
 
-1.  Đảm bảo Neo4j 2.0.3 đang chạy tại `http://localhost:7474`.
-2.  Cài đặt Python (nếu chưa có).
-3.  Cài thư viện `requests` cho Python:
-    ```bash
-    pip install requests
-    ```
-4.  Đặt 3 file dữ liệu (`airlines.csv`, `airports.csv`, `routes.csv`) cùng thư mục với file `neo4j_importer_legacy.py`.
+Neo4j yêu cầu các file CSV phải nằm trong thư mục `import` của dự án database để đảm bảo bảo mật.
 
-## 2. Nạp Dữ liệu
+### Cách tìm thư mục Import trên Neo4j Desktop:
+1.  Mở **Neo4j Desktop**.
+2.  Di chuột vào Database bạn đang chạy (ví dụ "My Project").
+3.  Bấm vào dấu ba chấm `...` (Manage).
+4.  Chọn **Open folder** -> **Import**.
+5.  Copy 3 file (`airlines.csv`, `airports.csv`, `routes.csv`) vào thư mục này.
 
-Chạy lệnh sau trong terminal/cmd:
+## 2. Nạp Dữ liệu (Chạy `import.cypher`)
 
-```bash
-python neo4j_importer_legacy.py
-```
+1.  Bấm **Start** để chạy Database.
+2.  Bấm **Open** để mở **Neo4j Browser**.
+3.  Copy toàn bộ nội dung file `import.cypher` và paste vào khung lệnh.
+4.  **Quan trọng**: Bật tùy chọn "Enable multi-statement query editor" trong phần Settings (biểu tượng bánh răng) của Neo4j Browser để chạy nhiều lệnh cùng lúc.
+5.  Bấm nút **Run** (Play).
 
-Script sẽ tự động:
-1.  Tạo Constraints (Ràng buộc duy nhất).
-2.  Đọc file CSV và gửi lệnh `CREATE/MERGE` đến Neo4j theo từng lô (batch) để tránh treo máy.
-3.  Quá trình nạp `routes.csv` (67k dòng) có thể mất vài phút.
+*Nếu không bật multi-statement, hãy copy và chạy từng khối lệnh riêng lẻ (tách nhau bởi dấu chấm phẩy `;`).*
 
-## 3. Chạy Truy vấn (Queries)
+## 3. Chạy Truy vấn Phân tích (Chạy `queries.cypher`)
 
-Sử dụng file `queries_legacy.cypher` đính kèm.
+File `queries.cypher` chứa 20 câu lệnh tương ứng với 20 yêu cầu của bài thực hành.
 
-*   Mở **Neo4j Browser** (`http://localhost:7474`).
-*   Copy từng câu lệnh trong file `queries_legacy.cypher` và chạy.
-*   **Lưu ý**: Các câu lệnh đã được tối ưu cho Neo4j 2.0 (không dùng hàm `distance()`, `point()`, `GDS` mà dùng công thức toán học cổ điển).
+1.  Mở file `queries.cypher` bằng Text Editor.
+2.  Copy **từng câu lệnh riêng lẻ** và chạy trong Neo4j Browser.
 
-## 4. Giải thích thay đổi cho bản 2.0.3
+### Lưu ý về Plugin GDS (Graph Data Science)
+Câu hỏi số 18 sử dụng thư viện GDS để phân tích thành phần liên thông. Để chạy được câu lệnh `CALL gds.wcc.stream...`, bạn cần cài đặt plugin này:
+1.  Trong Neo4j Desktop, bấm vào tên Database.
+2.  Chọn tab **Plugins**.
+3.  Tìm **Graph Data Science Library** và bấm **Install**.
+4.  Khởi động lại Database.
 
-*   **Import**: Thay vì `LOAD CSV` (không có), dùng Python script bắn API.
-*   **Khoảng cách**: Thay vì `distance()`, dùng công thức Haversine (`2 * 6371 * asin(...)`) trực tiếp trong Cypher.
-*   **Phân tích đồ thị**: Thay vì thư viện GDS (Graph Data Science), dùng các truy vấn Cypher thuần túy để kiểm tra tính liên thông cơ bản.
+Nếu không cài GDS, bạn vẫn có thể chạy các câu hỏi khác bình thường.
