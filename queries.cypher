@@ -1,144 +1,127 @@
-// 1. Đường bay ngắn nhất theo số chặng (Hops) từ Hà Nội (HAN) đến Paris (CDG)
-MATCH (start:Airport {iata: 'HAN'}), (end:Airport {iata: 'CDG'})
-MATCH p = shortestPath((start)-[*]->(end))
-RETURN [n in nodes(p) | n.name] AS Path, length(p) AS Hops,
-       reduce(s = 0, r in relationships(p) | s + r.stops) AS TotalStops;
+// ============================================================================
+// FILE TRUY VẤN NEO4J (Tasks 2 - 10)
+// ============================================================================
 
-// 2. Đường bay ngắn nhất theo khoảng cách (Haversine) Tokyo (NRT) -> London (LHR)
-MATCH (start:Airport {iata: 'NRT'}), (end:Airport {iata: 'LHR'})
-MATCH p = (start)-[*..3]->(end)
-RETURN [n in nodes(p) | n.name] AS Path,
-       reduce(dist = 0.0, r in relationships(p) | dist + r.distance) AS TotalDistanceKM
-ORDER BY TotalDistanceKM ASC
-LIMIT 1;
+// ============================================================================
+// CÂU 2: THÔNG TIN THỐNG KÊ CƠ BẢN
+// ============================================================================
+// 1. Tổng số sân bay và 5 sân bay đầu tiên
+MATCH (a:Airport)
+RETURN count(a) AS TotalAirports;
 
-// 3. Top 10 Sân bay có Bậc vào (In-Degree) cao nhất
-MATCH ()-[r:ROUTE]->(a:Airport)
-RETURN a.name AS Airport, count(DISTINCT startNode(r)) AS InDegree
-ORDER BY InDegree DESC
+MATCH (a:Airport)
+RETURN a.airportID, a.name, a.country
+ORDER BY a.airportID
+LIMIT 5;
+
+// 2. Tổng số hãng hàng không và danh sách
+MATCH (l:Airline)
+RETURN count(l) AS TotalAirlines;
+
+MATCH (l:Airline)
+RETURN l.airlineID, l.name, l.country
+LIMIT 5;
+
+
+// ============================================================================
+// CÂU 3: THỐNG KÊ TẦN SUẤT HOẠT ĐỘNG
+// ============================================================================
+// Số lượng tuyến bay mỗi hãng sở hữu
+MATCH ()-[r:ROUTE]->()
+RETURN r.airline AS AirlineCode, count(r) AS NumberOfRoutes
+ORDER BY NumberOfRoutes DESC
 LIMIT 10;
 
-// 4. Sân bay trung chuyển quan trọng tại Đức (Local Hubs)
-MATCH (a:Airport {country: 'Germany'})
-OPTIONAL MATCH (a)-[out:ROUTE]->()
-OPTIONAL MATCH ()-[in:ROUTE]->(a)
-RETURN a.name, count(DISTINCT out) + count(DISTINCT in) AS Degree
-ORDER BY Degree DESC
-LIMIT 5;
 
-// 5. Hãng hàng không có mạng lưới phủ sóng lớn nhất
-MATCH (a:Airline)
-MATCH (s:Airport)-[r:ROUTE]->(d:Airport)
-WHERE r.airlineID = a.airlineID
-WITH a, collect(DISTINCT s) + collect(DISTINCT d) AS nodes
-UNWIND nodes AS n
-RETURN a.name, count(DISTINCT n) AS CoverageCount
-ORDER BY CoverageCount DESC
-LIMIT 5;
+// ============================================================================
+// CÂU 4: KIỂM TRA ĐƯỜNG BAY HAN -> SGN
+// ============================================================================
+// Kiểm tra bay từ Nội Bài (HAN) đến Tân Sơn Nhất (SGN)
+MATCH (src:Airport {iata: 'HAN'}), (dest:Airport {iata: 'SGN'})
+OPTIONAL MATCH p = shortestPath((src)-[:ROUTE*..2]->(dest))
+RETURN p;
 
-// 6. Hãng hàng không độc quyền đường bay trực tiếp giữa 2 thành phố Việt Nam
-MATCH (s:Airport {country:'Vietnam'})-[r:ROUTE]->(d:Airport {country:'Vietnam'})
-WITH s, d, collect(DISTINCT r.airlineID) AS aids
-WHERE size(aids) = 1
-MATCH (a:Airline {airlineID: aids[0]})
-RETURN a.name AS ExclusiveAirline, s.city AS From, d.city AS To;
 
-// 7. Cặp quốc gia có mức độ kết nối trực tiếp cao nhất
-MATCH (s:Airport)-[r:ROUTE]->(d:Airport)
-WHERE s.country <> d.country AND r.stops = 0
-WITH s.country AS c1, d.country AS c2, count(r) AS FlightCount
-// Sắp xếp tên quốc gia để gộp chiều đi/về (A-B và B-A thành một cặp)
-WITH CASE WHEN c1 < c2 THEN c1 ELSE c2 END AS CountryA,
-     CASE WHEN c1 < c2 THEN c2 ELSE c1 END AS CountryB,
-     sum(FlightCount) AS TotalFlights
-RETURN CountryA, CountryB, TotalFlights
-ORDER BY TotalFlights DESC
-LIMIT 5;
+// ============================================================================
+// CÂU 5: TÍNH KHOẢNG CÁCH (HAVERSINE)
+// ============================================================================
+// Tính và cập nhật thuộc tính distance cho quan hệ ROUTE
+MATCH (a:Airport)-[r:ROUTE]->(b:Airport)
+WHERE a.latitude IS NOT NULL AND b.latitude IS NOT NULL
+WITH a, b, r,
+     point({latitude: toFloat(a.latitude), longitude: toFloat(a.longitude)}) AS p1,
+     point({latitude: toFloat(b.latitude), longitude: toFloat(b.longitude)}) AS p2
+SET r.distance = point.distance(p1, p2) / 1000
+RETURN count(r) AS UpdatedRoutes;
 
-// 8. Cổng Đông Nam Á đi Châu Âu
-MATCH (s:Airport)-[r:ROUTE]->(d:Airport)
-WHERE s.country IN ['Vietnam', 'Thailand', 'Singapore', 'Malaysia', 'Indonesia', 'Philippines', 'Myanmar', 'Cambodia', 'Laos', 'Brunei', 'Timor-Leste']
-  AND d.country IN ['France', 'Germany', 'United Kingdom', 'Italy', 'Spain', 'Netherlands', 'Belgium', 'Switzerland', 'Austria', 'Russia', 'Turkey', 'Denmark', 'Sweden', 'Norway', 'Finland', 'Poland', 'Greece']
-RETURN s.name, count(r) AS RoutesToEurope
-ORDER BY RoutesToEurope DESC
-LIMIT 1;
 
-// 9. Sân bay có độ đa dạng thiết bị bay cao nhất
-MATCH (a:Airport)-[r:ROUTE]-()
-WHERE r.equipment IS NOT NULL
-WITH a, split(r.equipment, ' ') AS types
-UNWIND types AS type
-RETURN a.name, count(DISTINCT type) AS EquipmentCount
-ORDER BY EquipmentCount DESC
-LIMIT 5;
+// ============================================================================
+// CÂU 6: TÌM SÂN BAY "NGUỒN" (SOURCE-ONLY)
+// ============================================================================
+// Tìm sân bay chỉ xuất phát đi mà không có chiều về (cho một hãng cụ thể, ví dụ '2G')
+MATCH (a:Airport)-[out:ROUTE]->()
+WHERE out.airline = '2G'
+AND NOT EXISTS {
+    MATCH ()-[in:ROUTE]->(a) WHERE in.airline = '2G'
+}
+RETURN DISTINCT a.name AS SourceOnlyAirport;
 
-// 10. Tìm các "Tam giác" đường bay (A->B->C->A) ngắn nhất
-MATCH (a:Airport)-[r1:ROUTE]->(b:Airport)-[r2:ROUTE]->(c:Airport)-[r3:ROUTE]->(a)
-WHERE a <> b AND b <> c AND a <> c
-WITH a, b, c, (r1.distance + r2.distance + r3.distance) AS TotalDist
-RETURN a.name, b.name, c.name, TotalDist
-ORDER BY TotalDist ASC
-LIMIT 5;
 
-// 11. Từ sân bay Phu cat (6193) bay đến đâu ở Việt Nam?
-MATCH (s:Airport {airportID: '6193'})-[r:ROUTE]->(d:Airport {country: 'Vietnam'})
-RETURN d.name;
+// ============================================================================
+// CÂU 7: HÀNH TRÌNH NGẮN NHẤT CDG -> HAN
+// ============================================================================
+// Tìm đường đi ngắn nhất theo khoảng cách (yêu cầu đã chạy Câu 5 để có distance)
+// Lưu ý: Cần sử dụng thư viện GDS.
+// Bước 1: Tạo Graph Projection có thuộc tính khoảng cách (nếu chưa tạo)
+// CALL gds.graph.project(
+//    'flightGraph',
+//    'Airport',
+//    'ROUTE',
+//    { relationshipProperties: 'distance' }
+// );
 
-// 12. Đường bay ngắn nhất từ Phu cat (6193) đến Pleiku (6194)
-MATCH (s:Airport {airportID: '6193'}), (d:Airport {airportID: '6194'})
-MATCH p = shortestPath((s)-[*]->(d))
-RETURN [n in nodes(p) | n.name] AS Path;
-
-// 13. Đường bay ngắn nhất từ Danang đến New York (JFK)
-MATCH (dad:Airport {city: 'Danang'}), (jfk:Airport {iata: 'JFK'})
-MATCH p = shortestPath((dad)-[*]->(jfk))
-RETURN [n in nodes(p) | n.name] AS Path;
-
-// 14. Chuyến bay trực tiếp Noi Bai -> Tan Son Nhat
-MATCH (s:Airport {airportID: '3199'})-[r:ROUTE]->(d:Airport {airportID: '3205'})
-MATCH (a:Airline {airlineID: r.airlineID})
-RETURN count(r) AS Count, collect(a.name) AS Airlines;
-
-// 15. Đường bay thẳng Vietnam -> Singapore
-MATCH (s:Airport {country: 'Vietnam'})-[r:ROUTE]->(d:Airport {country: 'Singapore'})
-RETURN DISTINCT s.name AS From, d.name AS To;
-
-// 16. 5 đường bay ngắn nhất từ Phu Cat đến JFK
-// Sử dụng shortestPath với limit (Cypher tiêu chuẩn tìm đường ngắn nhất, muốn k-shortest path thật sự cần GDS hoặc APOC)
-// Ở đây dùng mô phỏng tìm các đường ngắn bằng cách mở rộng hop limit
-MATCH (s:Airport {airportID: '6193'}), (d:Airport {iata: 'JFK'})
-MATCH p = (s)-[*..5]->(d)
-RETURN [n in nodes(p) | n.name] AS Path, length(p) AS Hops
-ORDER BY Hops ASC
-LIMIT 5;
-
-// 17. 10 đường bay ngẫu nhiên từ Phu cat qua đúng 3 sân bay trung chuyển (4 hops)
-MATCH p = (s:Airport {airportID: '6193'})-[*4]->(d:Airport)
-RETURN [n in nodes(p) | n.name] AS Path
-LIMIT 10;
-
-// 18. Phương án mở ít nhất các đường bay ở Vietnam (Phân tích liên thông)
-// Kiểm tra số lượng thành phần liên thông (Weakly Connected Components)
-// Yêu cầu thư viện GDS (Graph Data Science) được cài đặt.
-// Nếu chưa có GDS, dùng query đơn giản đếm số cụm.
-CALL gds.wcc.stream({
-    nodeQuery: 'MATCH (n:Airport {country: "Vietnam"}) RETURN id(n) AS id',
-    relationshipQuery: 'MATCH (n:Airport {country: "Vietnam"})-[r:ROUTE]->(m:Airport {country: "Vietnam"}) RETURN id(n) AS source, id(m) AS target'
+// Bước 2: Chạy thuật toán Dijkstra
+MATCH (source:Airport {iata: 'CDG'}), (target:Airport {iata: 'HAN'})
+CALL gds.shortestPath.dijkstra.stream('flightGraph', {
+    sourceNode: source,
+    targetNode: target,
+    relationshipWeightProperty: 'distance'
 })
-YIELD nodeId, componentId
-RETURN componentId, count(*) AS AirportsInComponent, collect(gds.util.asNode(nodeId).name) AS Airports
-ORDER BY AirportsInComponent DESC;
+YIELD index, totalCost, nodeIds, costs
+RETURN
+    totalCost AS TotalDistanceKM,
+    [nodeId IN nodeIds | gds.util.asNode(nodeId).name] AS PathNames;
 
-// 19. Đường bay ngắn nhất Vietnam -> Iceland
-MATCH (s:Airport {country: 'Vietnam'}), (d:Airport {country: 'Iceland'})
-MATCH p = shortestPath((s)-[*]->(d))
-RETURN [n in nodes(p) | n.name] AS Path, length(p) AS Hops
-ORDER BY Hops ASC
-LIMIT 1;
 
-// 20. Bay từ Vietnam sang US bằng Vietnam Airlines (5309)
-MATCH (s:Airport {country: 'Vietnam'}), (d:Airport {country: 'United States'})
-MATCH p = shortestPath((s)-[:ROUTE*..6]->(d))
-WHERE ALL(r IN relationships(p) WHERE r.airlineID = '5309')
-RETURN p IS NOT NULL AS Possible
-LIMIT 1;
+// ============================================================================
+// CÂU 8: PAGERANK (ĐỘ QUAN TRỌNG)
+// ============================================================================
+// Yêu cầu: Cần thư viện GDS.
+// 1. Tạo Graph Projection (lưu ý nếu dùng chung projection thì cần tạo 1 lần thôi)
+// CALL gds.graph.project('flightGraph', 'Airport', 'ROUTE', { relationshipProperties: 'distance' });
+
+// 2. Chạy PageRank
+CALL gds.pageRank.stream('flightGraph')
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).name AS Airport, score
+ORDER BY score DESC
+LIMIT 10;
+
+
+// ============================================================================
+// CÂU 9: COMMUNITY DETECTION (PHÂN NHÓM)
+// ============================================================================
+// Yêu cầu: Cần thư viện GDS và Graph Projection 'flightGraph'.
+CALL gds.louvain.stream('flightGraph')
+YIELD nodeId, communityId
+RETURN communityId, count(nodeId) AS Size, collect(gds.util.asNode(nodeId).name)[0..5] AS Examples
+ORDER BY Size DESC
+LIMIT 5;
+
+
+// ============================================================================
+// CÂU 10: TÍNH LIÊN THÔNG
+// ============================================================================
+// Kiểm tra Strong Connected Components (SCC)
+CALL gds.scc.stats('flightGraph')
+YIELD componentCount, maxComponentSize;

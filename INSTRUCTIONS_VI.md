@@ -1,40 +1,53 @@
-# Hướng dẫn Import Dữ liệu và Chạy Truy vấn (Neo4j Desktop 5.x)
+# HƯỚNG DẪN THỰC HÀNH (TIẾNG VIỆT)
 
-Tài liệu này hướng dẫn cách nạp dữ liệu vào Neo4j Desktop phiên bản hiện đại (5.x trở lên).
+Dự án này phân tích dữ liệu mạng lưới hàng không thế giới (OpenFlights) bằng Neo4j và Python, giải quyết 9 bài toán thực hành về đồ thị (Thống kê, Đường đi ngắn nhất, PageRank, Community Detection...).
 
-## 1. Chuẩn bị File CSV
+## 1. Cấu trúc thư mục
 
-Neo4j yêu cầu các file CSV phải nằm trong thư mục `import` của dự án database để đảm bảo bảo mật.
+*   `airlines.csv`, `airports.csv`, `routes.csv`: Dữ liệu gốc.
+*   `import.cypher`: Script để nạp dữ liệu vào Neo4j.
+*   `queries.cypher`: Các câu lệnh truy vấn Neo4j giải quyết 9 yêu cầu (Câu 2 - Câu 10).
+*   `solve_analysis.py`: Script Python thực hiện toàn bộ phân tích và tính toán (dùng NetworkX).
+*   `REPORT_VI.md`: Báo cáo chi tiết kết quả phân tích.
 
-### Cách tìm thư mục Import trên Neo4j Desktop:
-1.  Mở **Neo4j Desktop**.
-2.  Di chuột vào Database bạn đang chạy (ví dụ "My Project").
-3.  Bấm vào dấu ba chấm `...` (Manage).
-4.  Chọn **Open folder** -> **Import**.
-5.  Copy 3 file (`airlines.csv`, `airports.csv`, `routes.csv`) vào thư mục này.
+## 2. Hướng dẫn chạy
 
-## 2. Nạp Dữ liệu (Chạy `import.cypher`)
+### Cách 1: Sử dụng Python (Phân tích độc lập)
+Để xem kết quả phân tích ngay lập tức mà không cần cài Neo4j:
+```bash
+python3 solve_analysis.py
+```
+Kết quả sẽ được in ra màn hình console.
 
-1.  Bấm **Start** để chạy Database.
-2.  Bấm **Open** để mở **Neo4j Browser**.
-3.  Copy toàn bộ nội dung file `import.cypher` và paste vào khung lệnh.
-4.  **Quan trọng**: Bật tùy chọn "Enable multi-statement query editor" trong phần Settings (biểu tượng bánh răng) của Neo4j Browser để chạy nhiều lệnh cùng lúc.
-5.  Bấm nút **Run** (Play).
+### Cách 2: Sử dụng Neo4j (Thực hành Database)
+Yêu cầu: Đã cài đặt Neo4j Desktop hoặc Neo4j Server, và cài đặt plugin **Graph Data Science (GDS)** & **APOC**.
 
-*Nếu không bật multi-statement, hãy copy và chạy từng khối lệnh riêng lẻ (tách nhau bởi dấu chấm phẩy `;`).*
+**Bước 1: Nạp dữ liệu**
+1.  Copy 3 file csv vào thư mục `import` của Neo4j.
+2.  Chạy nội dung file `import.cypher` trong Neo4j Browser.
 
-## 3. Chạy Truy vấn Phân tích (Chạy `queries.cypher`)
+**Bước 2: Chạy truy vấn**
+1.  Mở file `queries.cypher`.
+2.  Copy và chạy từng khối lệnh tương ứng với từng câu hỏi (Câu 2 đến Câu 10).
 
-File `queries.cypher` chứa 20 câu lệnh tương ứng với 20 yêu cầu của bài thực hành.
+**Lưu ý:**
+*   **Câu 5** yêu cầu tính toán khoảng cách, hãy chạy trước khi làm câu 7.
+ *   **Câu 7, 8, 9, 10** yêu cầu thư viện GDS. Bạn cần tạo Graph Projection trước (bao gồm thuộc tính khoảng cách):
+    ```cypher
+     CALL gds.graph.project(
+        'flightGraph',
+        'Airport',
+        'ROUTE',
+        { relationshipProperties: 'distance' }
+     );
+    ```
 
-1.  Mở file `queries.cypher` bằng Text Editor.
-2.  Copy **từng câu lệnh riêng lẻ** và chạy trong Neo4j Browser.
-
-### Lưu ý về Plugin GDS (Graph Data Science)
-Câu hỏi số 18 sử dụng thư viện GDS để phân tích thành phần liên thông. Để chạy được câu lệnh `CALL gds.wcc.stream...`, bạn cần cài đặt plugin này:
-1.  Trong Neo4j Desktop, bấm vào tên Database.
-2.  Chọn tab **Plugins**.
-3.  Tìm **Graph Data Science Library** và bấm **Install**.
-4.  Khởi động lại Database.
-
-Nếu không cài GDS, bạn vẫn có thể chạy các câu hỏi khác bình thường.
+## 3. Nội dung bài thực hành
+*   **Câu 2-3:** Thống kê cơ bản (số lượng, tần suất).
+*   **Câu 4:** Kiểm tra đường bay (HAN -> SGN).
+*   **Câu 5:** Tính khoảng cách Haversine.
+*   **Câu 6:** Tìm sân bay "nguồn" (chỉ đi, không đến).
+*   **Câu 7:** Tìm đường đi ngắn nhất (Dijkstra).
+*   **Câu 8:** Xếp hạng sân bay (PageRank).
+*   **Câu 9:** Phân nhóm sân bay (Louvain).
+*   **Câu 10:** Kiểm tra tính liên thông của đồ thị.
