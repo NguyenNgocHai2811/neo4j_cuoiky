@@ -1,0 +1,15 @@
+// Tạo ràng buộc: Tên nhà ga (name) phải là duy nhất
+CREATE CONSTRAINT station_name_unique IF NOT EXISTS
+FOR (s:Station) REQUIRE s.name IS UNIQUE;
+
+LOAD CSV WITH HEADERS FROM 'file:///london_transport_datasets_London_stations.csv' AS row
+MERGE (s:Station {name: row.Station})
+SET s.osx = toFloat(row['OS X']),
+    s.osy = toFloat(row['OS Y']);
+
+LOAD CSV WITH HEADERS FROM 'file:///london_transport_datasets_London_tube_lines.csv' AS row
+MATCH (source:Station {name: row.From_Station})
+MATCH (target:Station {name: row.To_Station})
+MERGE (source)-[r:CONNECTED_TO {line: row.Tube_Line}]->(target)
+SET r.time = toInteger(row.time),
+    r.distance = toFloat(row.distance);
